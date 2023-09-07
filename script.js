@@ -167,7 +167,7 @@ function pointerEvents(e) {
   return pos
 }
 
-window.onresize = resizeCanvas(500, 500)
+window.onresize = resizeCanvas(250, 250)
 
 document.addEventListener('DOMContentLoaded', function (event) {
   if (isTouchDevice()) {
