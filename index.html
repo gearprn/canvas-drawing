@@ -1,23 +1,23 @@
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Drawing 🎨</title>
+    <title>Document</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div id="container">
-      <canvas
-        id="signature-pad"
-        class="signature-pad"
-        width="500"
-        height="500"
-      ></canvas>
-      <div>
-        <button id="data-btn">data</button>
-      </div>
-    </div>
+    <canvas
+      id="canvas"
+      width="600"
+      height="600"
+      style="border: solid black 1px"
+    >
+      Your browser does not support canvas element.
+    </canvas>
+    <br />
+    Log:
+    <pre id="log" style="border: 1px solid #ccc"></pre>
   </body>
-  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
   <script src="./script.js"></script>
 </html>

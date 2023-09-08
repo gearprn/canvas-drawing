@@ -1,25 +1,5 @@
-* {
-  margin: 0;
-  padding: 0;
-}
-
-#container {
-  width: 100vw;
-  height: 100vh;
-  background-color: grey;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-#data-btn {
-  margin: 5px;
-  padding: 2px;
-}
-
-canvas {
-  width: 500px;
-  height: 500px;
-  background-color: white;
+#log {
+  height: 200px;
+  width: 600px;
+  overflow: scroll;
 }
