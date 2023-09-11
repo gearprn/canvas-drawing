@@ -260,27 +260,37 @@ function handleStart(evt) {
     ctx.arc(touches[i].pageX, touches[i].pageY, 4, 0, 2 * Math.PI, false) // a circle at the start
     ctx.fillStyle = color
     ctx.fill()
-    updatePathsOfTouch(evt, touches[i].offsetX, touches[i].offsetY)
+    updatePathsOfTouch(
+      evt,
+      touches[i].identifier,
+      touches[i].clientX,
+      touches[i].clientY
+    )
   }
 }
 
 function handleMove(evt) {
   evt.preventDefault()
   const touches = evt.changedTouches
-
+  console.log(touchesPaths)
   for (let i = 0; i < touches.length; i++) {
     const idx = ongoingTouchIndexById(touches[i].identifier)
     if (idx >= 0) {
-      updatePathsOfTouch(evt, touches[i].offsetX, touches[i].offsetY)
-      log(`continuing touch ${idx}`)
-      log(
-        `ctx.moveTo( ${ongoingTouches[idx].pageX}, ${ongoingTouches[idx].pageY} );`
+      updatePathsOfTouch(
+        evt,
+        touches[i].identifier,
+        touches[i].clientX,
+        touches[i].clientY
       )
-      log(`ctx.lineTo( ${touches[i].pageX}, ${touches[i].pageY} );`)
+      // log(`continuing touch ${idx}`)
+      // log(
+      //   `ctx.moveTo( ${ongoingTouches[idx].pageX}, ${ongoingTouches[idx].pageY} );`
+      // )
+      // log(`ctx.lineTo( ${touches[i].pageX}, ${touches[i].pageY} );`)
       updateStroke(touches[i].identifier)
       ongoingTouches.splice(idx, 1, copyTouch(touches[i])) // swap in the new touch record
     } else {
-      log("can't figure out which touch to continue")
+      // log("can't figure out which touch to continue")
     }
   }
 }
