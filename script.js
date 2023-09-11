@@ -11,6 +11,19 @@ document.addEventListener('DOMContentLoaded', startup)
 
 const ongoingTouches = []
 
+/*
+identifier: {
+  pahts: [
+    {point}
+  ] 
+}
+*/
+const touchPaths = []
+const pathsBtn = document.getElementById('paths')
+pathsBtn.onclick = () => {
+  console.log('🚀 ~ file: script.js:23 ~ pathsBtn:', touchPaths)
+}
+
 function handleStart(evt) {
   evt.preventDefault()
   log('touchstart.')
@@ -20,6 +33,7 @@ function handleStart(evt) {
 
   for (let i = 0; i < touches.length; i++) {
     log(`touchstart: ${i}.`)
+    // const copyToucy
     ongoingTouches.push(copyTouch(touches[i]))
     const color = colorForTouch(touches[i])
     log(`color of touch with id ${touches[i].identifier} = ${color}`)
@@ -27,6 +41,37 @@ function handleStart(evt) {
     ctx.arc(touches[i].pageX, touches[i].pageY, 4, 0, 2 * Math.PI, false) // a circle at the start
     ctx.fillStyle = color
     ctx.fill()
+    updatePathsOfTouch(evt, touches[i])
+  }
+}
+
+function updatePathsOfTouch(event, touch) {
+  const idx = touchPaths.findIndex((v) => v.identifier == touch.identifier)
+  const pressure =
+    event.pressure !== undefined
+      ? event.pressure
+      : event.force !== undefined
+      ? event.force
+      : 0
+  if (idx == -1) {
+    touchPaths.push({
+      identifier: touch.identifier,
+      paths: [
+        {
+          x: touch.pageX,
+          y: touch.pageY,
+          pressure: pressure,
+          time: new Date().getTime(),
+        },
+      ],
+    })
+  } else {
+    touchPaths[idx].paths.push({
+      x: touch.pageX,
+      y: touch.pageY,
+      pressure: pressure,
+      time: new Date().getTime(),
+    })
   }
 }
 
@@ -54,6 +99,7 @@ function handleMove(evt) {
       ctx.stroke()
 
       ongoingTouches.splice(idx, 1, copyTouch(touches[i])) // swap in the new touch record
+      updatePathsOfTouch(evt, touches[i])
     } else {
       log("can't figure out which touch to continue")
     }
@@ -125,5 +171,5 @@ function ongoingTouchIndexById(idToFind) {
 function log(msg) {
   const container = document.getElementById('log')
   container.textContent = `${msg} \n${container.textContent}`
-  console.log(`${msg} \n${container.textContent}`)
+  // console.log(`${msg} \n${container.textContent}`)
 }
