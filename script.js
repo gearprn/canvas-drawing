@@ -9,7 +9,60 @@ function startup() {
   el.addEventListener('mousemove', handleMouseMove)
   el.addEventListener('mouseup', handleMouseUp)
 
+  el.addEventListener('wheel', (e) => adjustZoom(e.deltaY * SCROLL_SENSITIVITY))
+
+  drawCanvas()
   log('Initialized.')
+}
+
+var cameraZoom = 1
+let cameraOffset = { x: 400 / 2, y: 400 / 2 }
+let dragStart = { x: 0, y: 0 }
+let isDragging = false
+
+function drawCanvas() {
+  const canvas = document.getElementById('canvas')
+  const ctx = canvas.getContext('2d')
+
+  canvas.width = 400
+  canvas.height = 400
+
+  ctx.scale(cameraZoom, cameraZoom)
+  ctx.translate(-400 / 2 + cameraOffset.x, -400 / 2 + cameraOffset.y)
+
+  ctx.fillStyle = '#000000'
+  touchesPaths.forEach(
+    (t) => {
+      t.paths.forEach((p, idx) => {
+        // console.log('🚀 ~ file: script.js:37 ~ t.paths.forEach ~ idx:', idx)
+        if (idx > 2) {
+          options = {
+            penColor: 'black',
+            dotSize: '0',
+            minWidth: '0.5',
+            maxWidth: '2.5',
+            velocityFilterWeight: '0.7',
+            compositeOperation: 'source-over',
+          }
+          const widths = calculateCurveWidths(
+            t.paths[idx - 1],
+            t.paths[idx],
+            options
+          )
+          const curve = BezierFromPoints(
+            t.paths.slice(idx - 3, idx + 1),
+            widths
+          )
+          if (curve) {
+            drawCurve(curve, options)
+          }
+        }
+      })
+    }
+    // if (t.paths.length > 3) {
+    // }
+  )
+  requestAnimationFrame(drawCanvas)
 }
 
 document.addEventListener('DOMContentLoaded', startup)
@@ -31,6 +84,29 @@ let lastWidth = 0
 const pathsBtn = document.getElementById('paths')
 pathsBtn.onclick = () => {
   console.log('🚀 ~ file: script.js:23 ~ pathsBtn:', touchesPaths)
+}
+
+const scaleUpBtn = document.getElementById('scale-up')
+scaleUpBtn.onclick = () => {
+  cameraZoom *= 1.25
+  console.log('🚀 ~ file: script.js:45 ~ cameraZoom:', cameraZoom)
+}
+
+const scaleDownBtn = document.getElementById('scale-down')
+scaleDownBtn.onclick = () => {
+  if (cameraZoom * 0.75 > 1) {
+    cameraZoom *= 0.75
+  } else {
+    cameraZoom = 1
+  }
+  console.log('🚀 ~ file: script.js:51 ~ cameraZoom:', cameraZoom)
+}
+
+var isDragMode = false
+const dragBtn = document.getElementById('drag')
+dragBtn.onclick = () => {
+  isDragMode = !isDragMode
+  console.log('🚀 ~ file: script.js:99 ~ isDragMode:', isDragMode)
 }
 
 function updatePathsOfTouch(event, identifier, x, y) {
@@ -61,6 +137,10 @@ function updatePathsOfTouch(event, identifier, x, y) {
       time: new Date().getTime(),
     })
   }
+  console.log(
+    '🚀 ~ file: script.js:103 ~ updatePathsOfTouch ~ touchesPaths:',
+    touchesPaths
+  )
 }
 
 function getTouchPaths(identifier) {
@@ -332,56 +412,54 @@ function handleCancel(evt) {
 
 let drawningStroke = false
 function handleMouseDown(evt) {
-  if (evt.buttons === 1) {
-    drawningStroke = true
-    evt.preventDefault()
-    const el = document.getElementById('canvas')
-    const ctx = el.getContext('2d')
-    ctx.beginPath()
-    ctx.arc(evt.offsetX, evt.offsetY, 4, 0, 2 * Math.PI, false) // a circle at the start
-    ctx.fillStyle = 'black'
-    ctx.fill()
-    updatePathsOfTouch(evt, 'mouse', evt.offsetX, evt.offsetY)
+  if (!isDragMode) {
+    if (evt.buttons === 1) {
+      x = evt.offsetX / cameraZoom - (cameraOffset.x - 200)
+      y = evt.offsetY / cameraZoom - (cameraOffset.y - 200)
+      drawningStroke = true
+      updatePathsOfTouch(evt, 'mouse', x, y)
+    }
+  } else {
+    {
+      isDragging = true
+      dragStart.x = getEventLocation(evt).x / cameraZoom - cameraOffset.x
+      dragStart.y = getEventLocation(evt).y / cameraZoom - cameraOffset.y
+    }
   }
 }
 
 function handleMouseMove(evt) {
-  if (drawningStroke) {
-    updatePathsOfTouch(evt, 'mouse', evt.offsetX, evt.offsetY)
-    const el = document.getElementById('canvas')
-    const ctx = el.getContext('2d')
-    ctx.beginPath()
-    ctx.moveTo(evt.offsetX, evt.offsetY)
-    const prevPaths = getTouchPaths('mouse')
-    console.log(
-      '🚀 ~ file: script.js:347 ~ handleMouseMove ~ prevPaths.paths.length:',
-      prevPaths.paths.length
-    )
-    if (prevPaths.paths.length > 3) {
-      updateStroke('mouse')
+  if (!isDragMode) {
+    if (drawningStroke) {
+      x = evt.offsetX / cameraZoom - (cameraOffset.x - 200)
+      y = evt.offsetY / cameraZoom - (cameraOffset.y - 200)
+      updatePathsOfTouch(evt, 'mouse', x, y)
     }
-    // this._strokeMoveUpdate(evt)
+  } else {
+    if (isDragging) {
+      cameraOffset.x = getEventLocation(evt).x / cameraZoom - dragStart.x
+      cameraOffset.y = getEventLocation(evt).y / cameraZoom - dragStart.y
+    }
   }
 }
 
 function handleMouseUp(evt) {
-  if (drawningStroke) {
-    drawningStroke = false
-    const el = document.getElementById('canvas')
-    const ctx = el.getContext('2d')
-    const prevPaths = getTouchPaths('mouse')
-    if (prevPaths) {
-      ctx.lineWidth = 4
-      ctx.fillStyle = 'black'
-      ctx.beginPath()
-      ctx.moveTo(
-        prevPaths.paths[prevPaths.paths.length - 1].x,
-        prevPaths.paths[prevPaths.paths.length - 1].y
-      )
-      ctx.lineTo(evt.offsetX, evt.offsetY)
-      ctx.fillRect(evt.offsetX - 4, evt.offsetY - 4, 8, 8) // and a square at the end
-      removeTouchPaths('mouse')
+  if (!isDragMode) {
+    if (drawningStroke) {
+      drawningStroke = false
     }
+  } else {
+    isDragging = false
+    initialPinchDistance = null
+    lastZoom = cameraZoom
+  }
+}
+
+function getEventLocation(e) {
+  if (e.touches && e.touches.length == 1) {
+    return { x: e.touches[0].offsetX, y: e.touches[0].offsetY }
+  } else if (e.offsetX && e.offsetY) {
+    return { x: e.offsetX, y: e.offsetY }
   }
 }
 
@@ -418,6 +496,10 @@ function log(msg) {
 }
 
 function updateStroke(identifier) {
+  console.log(
+    '🚀 ~ file: script.js:486 ~ updateStroke ~ updateStroke:',
+    updateStroke
+  )
   const prevPaths = getTouchPaths(identifier)
   options = {
     penColor: 'black',
