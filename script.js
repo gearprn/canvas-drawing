@@ -4,6 +4,11 @@ function startup() {
   el.addEventListener('touchend', handleEnd)
   el.addEventListener('touchcancel', handleCancel)
   el.addEventListener('touchmove', handleMove)
+
+  el.addEventListener('mousedown', handleMouseDown)
+  el.addEventListener('mousemove', handleMouseMove)
+  el.addEventListener('mouseup', handleMouseUp)
+
   log('Initialized.')
 }
 
@@ -28,8 +33,8 @@ pathsBtn.onclick = () => {
   console.log('🚀 ~ file: script.js:23 ~ pathsBtn:', touchesPaths)
 }
 
-function updatePathsOfTouch(event, touch) {
-  const idx = touchesPaths.findIndex((v) => v.identifier == touch.identifier)
+function updatePathsOfTouch(event, identifier, x, y) {
+  const idx = touchesPaths.findIndex((v) => v.identifier == identifier)
   const pressure =
     event.pressure !== undefined
       ? event.pressure
@@ -38,11 +43,11 @@ function updatePathsOfTouch(event, touch) {
       : 0
   if (idx < 0) {
     touchesPaths.push({
-      identifier: touch.identifier,
+      identifier: identifier,
       paths: [
         {
-          x: touch.pageX,
-          y: touch.pageY,
+          x: x,
+          y: y,
           pressure: pressure,
           time: new Date().getTime(),
         },
@@ -50,8 +55,8 @@ function updatePathsOfTouch(event, touch) {
     })
   } else {
     touchesPaths[idx].paths.push({
-      x: touch.pageX,
-      y: touch.pageY,
+      x: x,
+      y: y,
       pressure: pressure,
       time: new Date().getTime(),
     })
@@ -62,30 +67,14 @@ function getTouchPaths(identifier) {
   return touchesPaths.find((v) => v.identifier == identifier)
 }
 
+function removeTouchPaths(identifier) {
+  const idx = touchesPaths.findIndex((v) => v.identifier == identifier)
+  touchesPaths[idx].paths = []
+}
+
 function updateTouchPaths(identifier, touch) {
   const idx = touchesPaths.findIndex((v) => v.identifier == identifier)
   touchesPaths[idx] = touch
-}
-
-function handleStart(evt) {
-  evt.preventDefault()
-  log('touchstart.')
-  const el = document.getElementById('canvas')
-  const ctx = el.getContext('2d')
-  const touches = evt.changedTouches
-
-  for (let i = 0; i < touches.length; i++) {
-    log(`touchstart: ${i}.`)
-    // const copyToucy
-    ongoingTouches.push(copyTouch(touches[i]))
-    const color = colorForTouch(touches[i])
-    log(`color of touch with id ${touches[i].identifier} = ${color}`)
-    ctx.beginPath()
-    ctx.arc(touches[i].pageX, touches[i].pageY, 4, 0, 2 * Math.PI, false) // a circle at the start
-    ctx.fillStyle = color
-    ctx.fill()
-    updatePathsOfTouch(evt, touches[i])
-  }
 }
 
 function calculateCurveWidths(startPoint, endPoint, options) {
@@ -254,65 +243,42 @@ function drawCurve(curve, options) {
   ctx.fill()
 }
 
-function handleMove(evt) {
+function handleStart(evt) {
   evt.preventDefault()
+  log('touchstart.')
   const el = document.getElementById('canvas')
   const ctx = el.getContext('2d')
   const touches = evt.changedTouches
 
   for (let i = 0; i < touches.length; i++) {
+    log(`touchstart: ${i}.`)
+    // const copyToucy
+    ongoingTouches.push(copyTouch(touches[i]))
     const color = colorForTouch(touches[i])
-    const idx = ongoingTouchIndexById(touches[i].identifier)
+    log(`color of touch with id ${touches[i].identifier} = ${color}`)
+    ctx.beginPath()
+    ctx.arc(touches[i].pageX, touches[i].pageY, 4, 0, 2 * Math.PI, false) // a circle at the start
+    ctx.fillStyle = color
+    ctx.fill()
+    updatePathsOfTouch(evt, touches[i].offsetX, touches[i].offsetY)
+  }
+}
 
+function handleMove(evt) {
+  evt.preventDefault()
+  const touches = evt.changedTouches
+
+  for (let i = 0; i < touches.length; i++) {
+    const idx = ongoingTouchIndexById(touches[i].identifier)
     if (idx >= 0) {
-      updatePathsOfTouch(evt, touches[i])
+      updatePathsOfTouch(evt, touches[i].offsetX, touches[i].offsetY)
       log(`continuing touch ${idx}`)
-      ctx.beginPath()
       log(
         `ctx.moveTo( ${ongoingTouches[idx].pageX}, ${ongoingTouches[idx].pageY} );`
       )
-      ctx.moveTo(ongoingTouches[idx].pageX, ongoingTouches[idx].pageY)
       log(`ctx.lineTo( ${touches[i].pageX}, ${touches[i].pageY} );`)
-
-      const prevPaths = getTouchPaths(touches[i].identifier)
-      options = {
-        penColor: 'black',
-        dotSize: '0',
-        minWidth: '0.5',
-        maxWidth: '2.5',
-        velocityFilterWeight: '0.7',
-        compositeOperation: 'source-over',
-      }
-
-      if (prevPaths.paths.length > 2) {
-        // To reduce the initial lag make it work with 3 points
-        // by copying the first point to the beginning.
-        if (prevPaths.paths.length === 3) {
-          prevPaths.paths.unshift(prevPaths.paths[0])
-        }
-        // _points array will always have 4 points here.
-        const widths = calculateCurveWidths(
-          prevPaths.paths[1],
-          prevPaths.paths[2],
-          options
-        )
-        const curve = BezierFromPoints(prevPaths.paths, widths)
-        // Remove the first element from the list, so that there are no more than 4 points at any time.
-        prevPaths.paths.shift()
-        updateTouchPaths(touches[i].identifier, prevPaths)
-        if (curve) {
-          drawCurve(curve, options)
-        }
-      }
-
-      // old draw line
-      // ctx.lineTo(touches[i].pageX, touches[i].pageY)
-      // ctx.lineWidth = 4
-      // ctx.strokeStyle = color
-      // ctx.stroke()
-
+      updateStroke(touches[i].identifier)
       ongoingTouches.splice(idx, 1, copyTouch(touches[i])) // swap in the new touch record
-      // updatePathsOfTouch(evt, touches[i])
     } else {
       log("can't figure out which touch to continue")
     }
@@ -329,7 +295,6 @@ function handleEnd(evt) {
   for (let i = 0; i < touches.length; i++) {
     const color = colorForTouch(touches[i])
     let idx = ongoingTouchIndexById(touches[i].identifier)
-
     if (idx >= 0) {
       ctx.lineWidth = 4
       ctx.fillStyle = color
@@ -352,6 +317,61 @@ function handleCancel(evt) {
   for (let i = 0; i < touches.length; i++) {
     let idx = ongoingTouchIndexById(touches[i].identifier)
     ongoingTouches.splice(idx, 1) // remove it; we're done
+  }
+}
+
+let drawningStroke = false
+function handleMouseDown(evt) {
+  if (evt.buttons === 1) {
+    drawningStroke = true
+    evt.preventDefault()
+    const el = document.getElementById('canvas')
+    const ctx = el.getContext('2d')
+    ctx.beginPath()
+    ctx.arc(evt.offsetX, evt.offsetY, 4, 0, 2 * Math.PI, false) // a circle at the start
+    ctx.fillStyle = 'black'
+    ctx.fill()
+    updatePathsOfTouch(evt, 'mouse', evt.offsetX, evt.offsetY)
+  }
+}
+
+function handleMouseMove(evt) {
+  if (drawningStroke) {
+    updatePathsOfTouch(evt, 'mouse', evt.offsetX, evt.offsetY)
+    const el = document.getElementById('canvas')
+    const ctx = el.getContext('2d')
+    ctx.beginPath()
+    ctx.moveTo(evt.offsetX, evt.offsetY)
+    const prevPaths = getTouchPaths('mouse')
+    console.log(
+      '🚀 ~ file: script.js:347 ~ handleMouseMove ~ prevPaths.paths.length:',
+      prevPaths.paths.length
+    )
+    if (prevPaths.paths.length > 3) {
+      updateStroke('mouse')
+    }
+    // this._strokeMoveUpdate(evt)
+  }
+}
+
+function handleMouseUp(evt) {
+  if (drawningStroke) {
+    drawningStroke = false
+    const el = document.getElementById('canvas')
+    const ctx = el.getContext('2d')
+    const prevPaths = getTouchPaths('mouse')
+    if (prevPaths) {
+      ctx.lineWidth = 4
+      ctx.fillStyle = 'black'
+      ctx.beginPath()
+      ctx.moveTo(
+        prevPaths.paths[prevPaths.paths.length - 1].x,
+        prevPaths.paths[prevPaths.paths.length - 1].y
+      )
+      ctx.lineTo(evt.offsetX, evt.offsetY)
+      ctx.fillRect(evt.offsetX - 4, evt.offsetY - 4, 8, 8) // and a square at the end
+      removeTouchPaths('mouse')
+    }
   }
 }
 
@@ -385,4 +405,36 @@ function log(msg) {
   const container = document.getElementById('log')
   container.textContent = `${msg} \n${container.textContent}`
   // console.log(`${msg} \n${container.textContent}`)
+}
+
+function updateStroke(identifier) {
+  const prevPaths = getTouchPaths(identifier)
+  options = {
+    penColor: 'black',
+    dotSize: '0',
+    minWidth: '0.5',
+    maxWidth: '2.5',
+    velocityFilterWeight: '0.7',
+    compositeOperation: 'source-over',
+  }
+  if (prevPaths.paths.length > 2) {
+    // To reduce the initial lag make it work with 3 points
+    // by copying the first point to the beginning.
+    if (prevPaths.paths.length === 3) {
+      prevPaths.paths.unshift(prevPaths.paths[0])
+    }
+    // _points array will always have 4 points here.
+    const widths = calculateCurveWidths(
+      prevPaths.paths[1],
+      prevPaths.paths[2],
+      options
+    )
+    const curve = BezierFromPoints(prevPaths.paths, widths)
+    // Remove the first element from the list, so that there are no more than 4 points at any time.
+    prevPaths.paths.shift()
+    updateTouchPaths(identifier, prevPaths)
+    if (curve) {
+      drawCurve(curve, options)
+    }
+  }
 }
