@@ -36,7 +36,7 @@ function updatePathsOfTouch(event, touch) {
       : event.force !== undefined
       ? event.force
       : 0
-  if (idx == -1) {
+  if (idx < 0) {
     touchesPaths.push({
       identifier: touch.identifier,
       paths: [
@@ -62,9 +62,9 @@ function getTouchPaths(identifier) {
   return touchesPaths.find((v) => v.identifier == identifier)
 }
 
-function updateTouchPaths(identifier, paths) {
-  const idx = touchesPaths.find((v) => v.identifier == identifier)
-  touchesPaths[idx].paths = paths
+function updateTouchPaths(identifier, touch) {
+  const idx = touchesPaths.findIndex((v) => v.identifier == identifier)
+  touchesPaths[idx] = touch
 }
 
 function handleStart(evt) {
@@ -164,98 +164,94 @@ function calculateControlPoints(s1, s2, s3) {
 }
 
 // Calculate parametric value of x or y given t and the four point coordinates of a cubic bezier curve.
-function point(
-  t,
-  start,
-  c1,
-  c2,
-  end,
-) {
-  return (       start * (1.0 - t) * (1.0 - t)  * (1.0 - t))
-       + (3.0 *  c1    * (1.0 - t) * (1.0 - t)  * t)
-       + (3.0 *  c2    * (1.0 - t) * t          * t)
-       + (       end   * t         * t          * t);
+function point(t, start, c1, c2, end) {
+  return (
+    start * (1.0 - t) * (1.0 - t) * (1.0 - t) +
+    3.0 * c1 * (1.0 - t) * (1.0 - t) * t +
+    3.0 * c2 * (1.0 - t) * t * t +
+    end * t * t * t
+  )
 }
 
 function curveLength(curve) {
-  const steps = 10;
-  let length = 0;
-  let px;
-  let py;
+  const steps = 10
+  let length = 0
+  let px
+  let py
 
   for (let i = 0; i <= steps; i += 1) {
-    const t = i / steps;
+    const t = i / steps
     const cx = point(
       t,
-      this.startPoint.x,
-      this.control1.x,
-      this.control2.x,
-      this.endPoint.x,
-    );
+      curve.startPoint.x,
+      curve.control1.x,
+      curve.control2.x,
+      curve.endPoint.x
+    )
     const cy = point(
       t,
-      this.startPoint.y,
-      this.control1.y,
-      this.control2.y,
-      this.endPoint.y,
-    );
+      curve.startPoint.y,
+      curve.control1.y,
+      curve.control2.y,
+      curve.endPoint.y
+    )
     if (i > 0) {
-      const xdiff = cx - (px);
-      const ydiff = cy - (py);
+      const xdiff = cx - px
+      const ydiff = cy - py
 
-      length += Math.sqrt(xdiff * xdiff + ydiff * ydiff);
+      length += Math.sqrt(xdiff * xdiff + ydiff * ydiff)
     }
-    px = cx;
-    py = cy;
+    px = cx
+    py = cy
   }
-  return length;
+  return length
 }
 
 function drawCurveSegment(x, y, width) {
   const el = document.getElementById('canvas')
   const ctx = el.getContext('2d')
-  ctx.moveTo(x, y);
-  ctx.arc(x, y, width, 0, 2 * Math.PI, false);
+  ctx.moveTo(x, y)
+  ctx.arc(x, y, width, 0, 2 * Math.PI, false)
 }
 
 function drawCurve(curve, options) {
   const el = document.getElementById('canvas')
   const ctx = el.getContext('2d')
-  const widthDelta = curve.endWidth - curve.startWidth;
+  const widthDelta = curve.endWidth - curve.startWidth
   // '2' is just an arbitrary number here. If only length is used, then
   // there are gaps between curve segments :/
-  const drawSteps = Math.ceil(curveLength(curve)) * 2;
+  const drawSteps = Math.ceil(curveLength(curve)) * 2
 
-  ctx.beginPath();
-  ctx.fillStyle = options.penColor;
+  ctx.beginPath()
+  ctx.fillStyle = options.penColor
 
   for (let i = 0; i < drawSteps; i += 1) {
     // Calculate the Bezier (x, y) coordinate for this step.
-    const t = i / drawSteps;
-    const tt = t * t;
-    const ttt = tt * t;
-    const u = 1 - t;
-    const uu = u * u;
-    const uuu = uu * u;
+    const t = i / drawSteps
+    const tt = t * t
+    const ttt = tt * t
+    const u = 1 - t
+    const uu = u * u
+    const uuu = uu * u
 
-    let x = uuu * curve.startPoint.x;
-    x += 3 * uu * t * curve.control1.x;
-    x += 3 * u * tt * curve.control2.x;
-    x += ttt * curve.endPoint.x;
+    let x = uuu * curve.startPoint.x
+    x += 3 * uu * t * curve.control1.x
+    x += 3 * u * tt * curve.control2.x
+    x += ttt * curve.endPoint.x
 
-    let y = uuu * curve.startPoint.y;
-    y += 3 * uu * t * curve.control1.y;
-    y += 3 * u * tt * curve.control2.y;
-    y += ttt * curve.endPoint.y;
+    let y = uuu * curve.startPoint.y
+    y += 3 * uu * t * curve.control1.y
+    y += 3 * u * tt * curve.control2.y
+    y += ttt * curve.endPoint.y
 
     const width = Math.min(
       curve.startWidth + ttt * widthDelta,
-      options.maxWidth,
-    );
-    drawCurveSegment(x, y, width);
+      options.maxWidth
+    )
+    drawCurveSegment(x, y, width)
   }
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath()
+  ctx.fill()
 }
 
 function handleMove(evt) {
@@ -305,7 +301,7 @@ function handleMove(evt) {
         prevPaths.paths.shift()
         updateTouchPaths(touches[i].identifier, prevPaths)
         if (curve) {
-          drawCurve(curve)
+          drawCurve(curve, options)
         }
       }
 
@@ -316,7 +312,7 @@ function handleMove(evt) {
       // ctx.stroke()
 
       ongoingTouches.splice(idx, 1, copyTouch(touches[i])) // swap in the new touch record
-      updatePathsOfTouch(evt, touches[i])
+      // updatePathsOfTouch(evt, touches[i])
     } else {
       log("can't figure out which touch to continue")
     }
