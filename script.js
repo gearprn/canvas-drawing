@@ -12,7 +12,6 @@ function startup() {
   el.addEventListener('wheel', (e) => adjustZoom(e.deltaY * SCROLL_SENSITIVITY))
 
   drawCanvas()
-  log('Initialized.')
 }
 
 var cameraZoom = 1
@@ -68,17 +67,7 @@ function drawCanvas() {
 document.addEventListener('DOMContentLoaded', startup)
 
 const ongoingTouches = []
-
-/*
-touchesPaths = [
-  identifier: {
-    pahts: [
-      {point}
-    ]
-  }
-]
-*/
-const touchesPaths = []
+let touchesPaths = []
 let lastVelocity = 0
 let lastWidth = 0
 const pathsBtn = document.getElementById('paths')
@@ -106,7 +95,14 @@ var isDragMode = false
 const dragBtn = document.getElementById('drag')
 dragBtn.onclick = () => {
   isDragMode = !isDragMode
-  console.log('🚀 ~ file: script.js:99 ~ isDragMode:', isDragMode)
+  document.getElementById('drag-result').innerHTML = `drag: ${isDragMode}`
+}
+
+var isEraserMode = false
+const eraserBtn = document.getElementById('eraser')
+eraserBtn.onclick = () => {
+  isEraserMode = !isEraserMode
+  document.getElementById('eraser-result').innerHTML = `eraser: ${isEraserMode}`
 }
 
 function updatePathsOfTouch(event, identifier, x, y) {
@@ -137,10 +133,6 @@ function updatePathsOfTouch(event, identifier, x, y) {
       time: new Date().getTime(),
     })
   }
-  console.log(
-    '🚀 ~ file: script.js:103 ~ updatePathsOfTouch ~ touchesPaths:',
-    touchesPaths
-  )
 }
 
 function getTouchPaths(identifier) {
@@ -325,17 +317,14 @@ function drawCurve(curve, options) {
 
 function handleStart(evt) {
   evt.preventDefault()
-  log('touchstart.')
   const el = document.getElementById('canvas')
   const ctx = el.getContext('2d')
   const touches = evt.changedTouches
 
   for (let i = 0; i < touches.length; i++) {
-    log(`touchstart: ${i}.`)
     // const copyToucy
     ongoingTouches.push(copyTouch(touches[i]))
     const color = colorForTouch(touches[i])
-    log(`color of touch with id ${touches[i].identifier} = ${color}`)
     ctx.beginPath()
     ctx.arc(touches[i].pageX, touches[i].pageY, 4, 0, 2 * Math.PI, false) // a circle at the start
     ctx.fillStyle = color
@@ -362,11 +351,6 @@ function handleMove(evt) {
         touches[i].clientX,
         touches[i].clientY
       )
-      // log(`continuing touch ${idx}`)
-      // log(
-      //   `ctx.moveTo( ${ongoingTouches[idx].pageX}, ${ongoingTouches[idx].pageY} );`
-      // )
-      // log(`ctx.lineTo( ${touches[i].pageX}, ${touches[i].pageY} );`)
       updateStroke(touches[i].identifier)
       ongoingTouches.splice(idx, 1, copyTouch(touches[i])) // swap in the new touch record
     } else {
@@ -377,7 +361,6 @@ function handleMove(evt) {
 
 function handleEnd(evt) {
   evt.preventDefault()
-  log('touchend')
   const el = document.getElementById('canvas')
   const ctx = el.getContext('2d')
   const touches = evt.changedTouches
@@ -394,14 +377,13 @@ function handleEnd(evt) {
       ctx.fillRect(touches[i].pageX - 4, touches[i].pageY - 4, 8, 8) // and a square at the end
       ongoingTouches.splice(idx, 1) // remove it; we're done
     } else {
-      log("can't figure out which touch to end")
+      // log("can't figure out which touch to end")
     }
   }
 }
 
 function handleCancel(evt) {
   evt.preventDefault()
-  log('touchcancel.')
   const touches = evt.changedTouches
 
   for (let i = 0; i < touches.length; i++) {
@@ -411,29 +393,53 @@ function handleCancel(evt) {
 }
 
 let drawningStroke = false
+let mouseIdentifier = new Date().getTime()
 function handleMouseDown(evt) {
-  if (!isDragMode) {
+  mouseIdentifier = new Date().getTime()
+  // draw line
+  if (!isDragMode && !isEraserMode) {
     if (evt.buttons === 1) {
       x = evt.offsetX / cameraZoom - (cameraOffset.x - 200)
       y = evt.offsetY / cameraZoom - (cameraOffset.y - 200)
+      updatePathsOfTouch(evt, mouseIdentifier, x, y)
       drawningStroke = true
-      updatePathsOfTouch(evt, 'mouse', x, y)
     }
-  } else {
-    {
-      isDragging = true
-      dragStart.x = getEventLocation(evt).x / cameraZoom - cameraOffset.x
-      dragStart.y = getEventLocation(evt).y / cameraZoom - cameraOffset.y
-    }
+  } else if (isEraserMode) {
+    isDragging = true
+  } else if (isDragMode) {
+    isDragging = true
+    dragStart.x = getEventLocation(evt).x / cameraZoom - cameraOffset.x
+    dragStart.y = getEventLocation(evt).y / cameraZoom - cameraOffset.y
   }
 }
 
 function handleMouseMove(evt) {
-  if (!isDragMode) {
+  // draw line
+  if (!isDragMode && !isEraserMode) {
     if (drawningStroke) {
       x = evt.offsetX / cameraZoom - (cameraOffset.x - 200)
       y = evt.offsetY / cameraZoom - (cameraOffset.y - 200)
-      updatePathsOfTouch(evt, 'mouse', x, y)
+      const touchPaths = getTouchPaths(mouseIdentifier)
+      const lastPoint = touchPaths.paths[touchPaths.paths.length - 1]
+      const distance = distanceTo(lastPoint, { x: x, y: y })
+      if (distance >= 5) {
+        updatePathsOfTouch(evt, mouseIdentifier, x, y)
+      }
+    }
+  } else if (isEraserMode) {
+    x = evt.offsetX / cameraZoom - (cameraOffset.x - 200)
+    y = evt.offsetY / cameraZoom - (cameraOffset.y - 200)
+    if (isDragging) {
+      touchesPaths = touchesPaths.filter((t) => {
+        let isNear = false
+        t.paths.forEach((p) => {
+          const distance = distanceTo(p, { x: x, y: y })
+          if (distance <= 10) {
+            isNear = true
+          }
+        })
+        return !isNear
+      })
     }
   } else {
     if (isDragging) {
@@ -448,11 +454,17 @@ function handleMouseUp(evt) {
     if (drawningStroke) {
       drawningStroke = false
     }
+  } else if (isEraserMode) {
+    isDragging = false
   } else {
     isDragging = false
     initialPinchDistance = null
     lastZoom = cameraZoom
   }
+  console.log(
+    '🚀 ~ file: script.js:103 ~ updatePathsOfTouch ~ touchesPaths:',
+    touchesPaths.length
+  )
 }
 
 function getEventLocation(e) {
